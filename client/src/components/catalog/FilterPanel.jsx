@@ -67,12 +67,29 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                  }
              } catch(e) { console.error("Error parsing age value", e); }
 
-        } else if (name === 'stimScoreMin' || name === 'stimScoreMax') {
-             // Handle sliders - update the specific min or max
-             newFilters[name] = value;
-             // Optional: Add validation logic here if needed (e.g., min <= max)
+        } else if  (name === 'stimScoreMin' || name === 'stimScoreMax') {
+            // Handle sliders - update the specific min or max
+            const newValue = parseInt(value, 10); // Ensure value is integer
+            newFilters[name] = newValue;
+   
+            // Add validation: Ensure min <= max
+            const currentMin = parseInt(newFilters.stimScoreMin || filters.stimScoreMin || '1', 10);
+            const currentMax = parseInt(newFilters.stimScoreMax || filters.stimScoreMax || '5', 10);
+   
+            if (name === 'stimScoreMin' && newValue > currentMax) {
+                // If new min is greater than current max, set max to new min
+                newFilters.stimScoreMax = newValue;
+            } else if (name === 'stimScoreMax' && newValue < currentMin) {
+                // If new max is less than current min, set min to new max
+                newFilters.stimScoreMin = newValue;
+            }
+            // Convert back to string if necessary, though numbers should be fine for state
+            // newFilters.stimScoreMin = String(newFilters.stimScoreMin);
+            // newFilters.stimScoreMax = String(newFilters.stimScoreMax);
+   
+        } else { // ... rest of the function
 
-        } else {
+        }  {
             // Handle text input and selects
             if (value === '') {
                  // If a dropdown is set back to "Any" (empty value), remove the filter key

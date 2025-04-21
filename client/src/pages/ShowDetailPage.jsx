@@ -1,152 +1,113 @@
 // client/src/pages/ShowDetailPage.jsx
-import React, { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom'; // useParams to get ID from URL
-import { getShowById } from '../services/showService'; // API service function
-// Import chart components
+import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
+import { useParams, Link } from 'react-router-dom';
+import { getShowById } from '../services/showService';
 import { Pie } from 'react-chartjs-2';
 import { Bar } from 'react-chartjs-2';
 import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
 
-// Register ChartJS elements
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
-// Placeholder image if needed
-const placeholderImage = "/images/placeholder-show.png"; // Assuming you have this image in client/public/images
+const placeholderImage = "/images/placeholder-show.png";
 
 const ShowDetailPage = () => {
-    const { id } = useParams(); // Get the 'id' parameter from the URL
+    const { id } = useParams();
     const [show, setShow] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    const [pieChartData, setPieChartData] = useState(null); // State for Pie chart
-    const [barChartData, setBarChartData] = useState(null); // State for Bar chart
+    // Removed chart data state - will use memoized variables directly
 
-    // --- Log component renders ---
-    console.log("Rendering ShowDetailPage with Charts. isLoading:", isLoading, "Error:", error);
+    console.log("Rendering ShowDetailPage (Memo Fix Attempt). isLoading:", isLoading, "Error:", error);
 
-    // --- Fetch Show Data & Prepare Chart Data ---
+    // --- Fetch Show Data ---
     useEffect(() => {
-        console.log("ShowDetailPage Effect Running for ID:", id);
+        console.log("ShowDetailPage (Memo Fix Attempt) Effect Running for ID:", id);
         if (!id) {
-             setIsLoading(false);
-             setError("No Show ID provided.");
-             return;
+            setIsLoading(false);
+            setError("No Show ID provided.");
+            return;
         }
-
-        // Reset states before fetching
         setIsLoading(true);
         setError(null);
-        setPieChartData(null);
-        setBarChartData(null);
+        setShow(null); // Reset show data
 
         getShowById(id)
             .then(fetchedShowData => {
                 console.log("Fetched Show Detail Data:", fetchedShowData);
-                setShow(fetchedShowData);
-
-                // --- Prepare Chart Data ---
-                if (fetchedShowData) {
-                    // 1. Prepare Pie Chart Data (Approximate % Breakdown from Scores)
-                    const dialogueScore = fetchedShowData.dialogue_intensity_num ?? 0;
-                    const sceneFreqScore = fetchedShowData.scene_frequency_num ?? 0;
-                    const soundFxScore = fetchedShowData.sound_effects_level_num ?? 0;
-                    const musicScore = fetchedShowData.total_music_level_num ?? 0;
-                    const totalScoreSum = dialogueScore + sceneFreqScore + soundFxScore + musicScore;
-                    let piePercentages = [0, 0, 0, 0]; // [Dialogue, Scene Freq, Sound FX, Music]
-                    if (totalScoreSum > 0) {
-                        piePercentages = [
-                            (dialogueScore / totalScoreSum) * 100,
-                            (sceneFreqScore / totalScoreSum) * 100,
-                            (soundFxScore / totalScoreSum) * 100,
-                            (musicScore / totalScoreSum) * 100,
-                        ];
-                    }
-                    setPieChartData({
-                        labels: ['Dialogue', 'Scene Freq.', 'Sound FX', 'Music'],
-                        datasets: [{
-                            label: 'Approx. Contribution by Factor Score',
-                            data: piePercentages,
-                            backgroundColor: [
-                                'rgba(255, 99, 132, 0.6)', // Red
-                                'rgba(54, 162, 235, 0.6)', // Blue
-                                'rgba(255, 206, 86, 0.6)', // Yellow
-                                'rgba(75, 192, 192, 0.6)', // Green
-                            ],
-                            borderColor: '#ffffff',
-                            borderWidth: 1,
-                        }]
-                    });
-
-                    // 2. Prepare Bar Chart Data (Sensory Factor Levels)
-                    setBarChartData({
-                        labels: ['Dialogue', 'Scene Freq.', 'Sound FX', 'Music'],
-                        datasets: [{
-                            label: fetchedShowData.title || 'This Show',
-                            data: [
-                                fetchedShowData.dialogue_intensity_num ?? 0,
-                                fetchedShowData.scene_frequency_num ?? 0,
-                                fetchedShowData.sound_effects_level_num ?? 0,
-                                fetchedShowData.total_music_level_num ?? 0
-                            ],
-                            backgroundColor: 'rgba(54, 162, 235, 0.6)', // Blue
-                            borderColor: 'rgba(54, 162, 235, 1)',
-                            borderWidth: 1,
-                        }]
-                    });
-                } else {
-                    // If fetch returned no data
-                    setShow(null);
-                }
+                // ** Only set show data and loading state here **
+                setShow(fetchedShowData || null); // Set to null if fetch returns nothing
+                setIsLoading(false);
             })
             .catch(err => {
-                console.error("ShowDetailPage fetch error:", err);
+                console.error("ShowDetailPage (Memo Fix Attempt) fetch error:", err);
                 setError(err.message || `Failed to load show with ID ${id}.`);
-                setShow(null); // Clear show data on error
-            })
-            .finally(() => {
-                console.log("Fetch attempt finished.");
+                setShow(null);
                 setIsLoading(false);
             });
 
-        // Cleanup function
         return () => {
-            console.log("ShowDetailPage Effect Cleanup for ID:", id);
+            console.log("ShowDetailPage (Memo Fix Attempt) Effect Cleanup for ID:", id);
         };
-    }, [id]); // Re-run effect ONLY if the ID from the URL changes
+    }, [id]); // Depend only on ID
 
+    // --- Prepare Chart Data using useMemo ---
+    const pieChartData = useMemo(() => {
+        if (!show) return null; // Return null if show data isn't loaded yet
+        console.log("Memoizing Pie Chart Data"); // Log memo calculation
 
-    // --- Chart Options ---
-    const chartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-         plugins: {
-             legend: {
-                 position: 'top',
-             },
-             title: {
-                display: false,
-             },
-         },
-    };
-
-    const barChartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'top',
-            },
-            title: {
-                display: false,
-            },
-        },
-        scales: {
-            y: {
-                beginAtZero: true,
-                suggestedMax: 5,
-                ticks: { stepSize: 1 }
-            }
+        const dialogueScore = show.dialogue_intensity_num ?? 0;
+        const sceneFreqScore = show.scene_frequency_num ?? 0;
+        const soundFxScore = show.sound_effects_level_num ?? 0;
+        const musicScore = show.total_music_level_num ?? 0;
+        const totalScoreSum = dialogueScore + sceneFreqScore + soundFxScore + musicScore;
+        let piePercentages = [0, 0, 0, 0];
+        if (totalScoreSum > 0) {
+            piePercentages = [
+                (dialogueScore / totalScoreSum) * 100,
+                (sceneFreqScore / totalScoreSum) * 100,
+                (soundFxScore / totalScoreSum) * 100,
+                (musicScore / totalScoreSum) * 100,
+            ];
         }
+        return {
+            labels: ['Dialogue', 'Scene Freq.', 'Sound FX', 'Music'],
+            datasets: [{
+                label: 'Approx. Contribution by Factor Score',
+                data: piePercentages,
+                backgroundColor: [
+                    'rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)',
+                    'rgba(255, 206, 86, 0.6)', 'rgba(75, 192, 192, 0.6)'
+                ],
+                borderColor: '#ffffff', borderWidth: 1,
+            }]
+        };
+    }, [show]); // Recalculate only when show data changes
+
+    const barChartData = useMemo(() => {
+        if (!show) return null; // Return null if show data isn't loaded yet
+        console.log("Memoizing Bar Chart Data"); // Log memo calculation
+
+        return {
+            labels: ['Dialogue', 'Scene Freq.', 'Sound FX', 'Music'],
+            datasets: [{
+                label: show.title || 'This Show',
+                data: [
+                    show.dialogue_intensity_num ?? 0, show.scene_frequency_num ?? 0,
+                    show.sound_effects_level_num ?? 0, show.total_music_level_num ?? 0
+                ],
+                backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1,
+            }]
+        };
+    }, [show]); // Recalculate only when show data changes
+
+
+    // --- Chart Options (remain the same) ---
+    const chartOptions = {
+        responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: false } },
+    };
+    const barChartOptions = {
+        responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 5, ticks: { stepSize: 1 } } }
     };
 
 
@@ -154,19 +115,17 @@ const ShowDetailPage = () => {
     if (isLoading) {
         return <p className="text-center text-lg text-gray-600 py-10">Loading show details...</p>;
     }
-
     if (error) {
         return <p className="text-center text-red-600 bg-red-100 p-4 rounded border border-red-300">{error}</p>;
     }
-
     if (!show) {
-        return <p className="text-center text-gray-500 py-10">Show data not available.</p>;
+         return <p className="text-center text-gray-500 py-10">Show data not available.</p>;
     }
 
     // Determine image URL
     const imageUrl = show.image_filename ? `/images/${show.image_filename}` : placeholderImage;
 
-    // Helper for friendly explanation
+    // Helper function (remains the same)
     const getInteractionExplanation = (level) => {
         switch (level?.toLowerCase()) {
             case 'high': return "This show frequently asks questions or prompts viewers to participate (like Blue's Clues or Dora).";
@@ -178,22 +137,21 @@ const ShowDetailPage = () => {
     };
 
 
-    // --- JSX Output with Charts and onError Restored ---
+    // --- JSX Output with Charts using memoized data ---
     return (
         <div className="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-lg shadow-lg">
             {/* Header Section */}
             <div className="flex flex-col md:flex-row gap-6 mb-8 border-b pb-6">
                 <div className="md:w-1/3 flex-shrink-0">
                      <img
-                        src={imageUrl} // Use determined imageUrl
+                        src={imageUrl}
                         alt={`${show.title} primary image`}
-                        className="rounded-lg shadow-md w-full object-contain mb-3 bg-gray-100" // Removed fixed height
-                        onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }} // <-- Restored onError
+                        className="rounded-lg shadow-md w-full object-contain mb-3 bg-gray-100"
+                        onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }}
                      />
                 </div>
                 <div className="md:w-2/3">
-                    {/* ... (rest of header content is the same) ... */}
-                    <h1 className="text-3xl md:text-4xl font-bold text-teal-800 mb-2">{show.title}</h1>
+                     <h1 className="text-3xl md:text-4xl font-bold text-teal-800 mb-2">{show.title}</h1>
                     <p className="text-lg text-gray-600 mb-3">
                         <strong>Age Range:</strong> {show.target_age_group}
                     </p>
@@ -223,6 +181,7 @@ const ShowDetailPage = () => {
                 <div className="border p-4 rounded-lg shadow-sm">
                      <h2 className="text-xl font-semibold text-center mb-4 text-teal-700">Stimulation Breakdown</h2>
                      <div className="relative h-64 md:h-80">
+                         {/* Use memoized data */}
                          {pieChartData ? (
                              <Pie data={pieChartData} options={chartOptions} />
                          ) : (
@@ -235,6 +194,7 @@ const ShowDetailPage = () => {
                  <div className="border p-4 rounded-lg shadow-sm">
                      <h2 className="text-xl font-semibold text-center mb-4 text-teal-700">Sensory Factor Levels</h2>
                      <div className="relative h-64 md:h-80">
+                         {/* Use memoized data */}
                          {barChartData ? (
                              <Bar data={barChartData} options={barChartOptions} />
                          ) : (
@@ -244,19 +204,15 @@ const ShowDetailPage = () => {
                 </div>
             </div>
 
-
              {/* Interaction Level & Narrative Summary */}
              <div className="space-y-6">
-                 {/* Interaction Level */}
                  <div className="border p-4 rounded-lg shadow-sm bg-teal-50">
-                     <h2 className="text-xl font-semibold mb-2 text-teal-700">Interaction Level: {show.interactivity_level || 'N/A'}</h2>
+                     <h2 className="text-xl font-semibold mb-2 text- teal-700">Interaction Level: {show.interactivity_level || 'N/A'}</h2>
                      <p className="text-gray-700">{getInteractionExplanation(show.interactivity_level)}</p>
                  </div>
-
-                 {/* Narrative Summary Placeholder */}
                  <div className="border p-4 rounded-lg shadow-sm">
                      <h2 className="text-xl font-semibold mb-2 text-gray-700">Summary & Sensory Notes</h2>
-                     <p className="text-gray-600 italic">(Detailed narrative summary and sensory implications to be added later based on full analysis...)</p>
+                     <p className="text-gray-600 italic">(Detailed narrative summary...)</p>
                      <p className='mt-2 text-sm text-gray-600'><strong>Animation Style:</strong> {show.animation_style || 'N/A'}</p>
                  </div>
              </div>
@@ -267,7 +223,6 @@ const ShowDetailPage = () => {
                     ← Back to Catalog
                 </Link>
             </div>
-
         </div>
     );
 };

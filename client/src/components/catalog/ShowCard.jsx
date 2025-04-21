@@ -2,8 +2,8 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 
-// Placeholder image if actual image is missing
-const placeholderImage = "/images/placeholder-show.png"; // We need to create this image
+// Placeholder image if actual image is missing or fails to load
+const placeholderImage = "/images/sstc.jpg";
 
 // Helper to generate score visualization (example: simple bars)
 const ScoreVisual = ({ score }) => {
@@ -22,37 +22,40 @@ const ScoreVisual = ({ score }) => {
     );
 };
 
-
 // The ShowCard component receives 'show' data as a prop
 const ShowCard = ({ show }) => {
+    // *** ADDED LOGS ***
+    console.log(`>>> Rendering ShowCard for ID: ${show?.id}, Title: ${show?.title}`); // Log start of render
+    if (!show || !show.id) {
+        console.error(">>> ShowCard received invalid or missing show prop:", show);
+        return <div className="border border-red-300 p-2 text-red-600 text-xs">Invalid Show Data</div>; // Render placeholder on error
+    }
+
     // Destructure show data with defaults for safety
     const {
         id,
         title = "Unknown Title",
         target_age_group = "N/A",
-        themes = [], // Expecting themes to be an array already parsed by CatalogPage
+        themes = [], // Expecting themes to be an array already parsed by server/service
         stimulation_score = 0,
-        image_filename = null // Will eventually come from DB
+        image_filename = null
     } = show;
 
-    // Determine image source - use placeholder if filename is null/empty
-    // TODO: Adjust path if images are served from backend or CDN
     const imageUrl = image_filename ? `/images/${image_filename}` : placeholderImage;
+    const displayedThemes = Array.isArray(themes) ? themes.slice(0, 3) : []; // Ensure themes is array
 
-    // Limit the number of themes displayed on the card
-    const displayedThemes = themes.slice(0, 3); // Show max 3 themes
+    console.log(`>>> ShowCard (ID: ${id}) is about to return JSX.`); // Log before returning JSX
 
     return (
         <div className="border border-gray-200 rounded-lg shadow-md bg-white overflow-hidden flex flex-col transition duration-200 hover:shadow-lg">
             {/* Show Image */}
             <div className="w-full h-40 bg-gray-200 flex items-center justify-center">
-                {/* Use aspect-ratio and object-cover if images have varying dimensions */}
                 <img
-                    // src={imageUrl} // Use this when images are available
-                    src={placeholderImage} // Use placeholder FOR NOW
+                    src={imageUrl}
                     alt={`${title} poster`}
-                    className="w-full h-full object-cover" // Adjust object-fit as needed (cover, contain)
-                    onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }} // Fallback if image fails to load
+                    className="w-full h-full object-cover"
+                    onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }}
+                    loading="lazy" // Added lazy loading here too
                 />
             </div>
 
@@ -65,30 +68,32 @@ const ShowCard = ({ show }) => {
                     Age: {target_age_group}
                 </p>
 
-                 {/* Themes */}
-                <div className="mb-3 flex flex-wrap gap-1">
-                     {displayedThemes.length > 0 ? displayedThemes.map((theme, index) => (
-                         <span key={index} className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">
-                             {theme}
-                         </span>
-                     )) : (
-                         <span className="text-xs text-gray-400 italic">No themes listed</span>
-                     )}
-                     {themes.length > 3 && (
+                {/* Themes */}
+                <div className="mb-3 flex flex-wrap gap-1 min-h-[20px]"> {/* Added min-height */}
+                    {displayedThemes.length > 0 ? displayedThemes.map((theme, index) => (
+                        <span key={index} className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">
+                            {theme}
+                        </span>
+                    )) : (
+                        <span className="text-xs text-gray-400 italic">No themes listed</span>
+                    )}
+                    {Array.isArray(themes) && themes.length > 3 && (
                         <span className="text-xs text-gray-400 px-2 py-0.5">...</span>
-                     )}
+                    )}
                 </div>
 
                 {/* Stimulation Score */}
                 <div className="mb-4">
-                     <ScoreVisual score={stimulation_score} />
+                    <ScoreVisual score={stimulation_score} />
                 </div>
 
                 {/* Learn More Button */}
-                <div className="mt-auto"> {/* Pushes button to the bottom */}
+                <div className="mt-auto">
                     <Link
                         to={`/show/${id}`} // Link to the detail page using the show's ID
                         className="block w-full text-center px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition duration-200 text-sm"
+                        // *** ADDED LOG ***
+                        onClick={() => console.log(`>>> Clicking Learn More link for Show ID: ${id}`)}
                     >
                         Learn More
                     </Link>
