@@ -58,7 +58,7 @@ const FilterPanelComponent = ({ filters = {}, onFilterChange, searchInputValue, 
 
         let updatedFilters = { ...currentNonSearchFilters }; // Start with non-search filters
 
-        // Logic for handling different types of inputs
+        // --- Handle Theme Checkboxes ---
         if (type === 'checkbox' && name === 'themes') {
             const currentThemes = filters.themes ? filters.themes.split(',').filter(t => t) : [];
             if (checked) {
@@ -66,37 +66,58 @@ const FilterPanelComponent = ({ filters = {}, onFilterChange, searchInputValue, 
             } else {
                 updatedFilters.themes = currentThemes.filter(theme => theme !== value).join(',');
             }
-            if (!updatedFilters.themes) delete updatedFilters.themes; // Remove key if empty
+            // If no themes are selected, remove the 'themes' filter key entirely
+            if (!updatedFilters.themes) delete updatedFilters.themes;
 
+        // --- Handle Age Range Radio Buttons ---
         } else if (name === 'ageRange') {
              try {
+                // The value is a JSON string like '{"min":3,"max":5}', parse it
                 const ageValue = JSON.parse(value);
-                 if (ageValue.min === 0 && ageValue.max === 99) { // "Any Age" selected
-                     delete updatedFilters.minAge;
-                     delete updatedFilters.maxAge;
-                 } else {
-                    updatedFilters.minAge = ageValue.min;
-                    updatedFilters.maxAge = ageValue.max;
-                 }
-             } catch(e) { console.error("Error parsing age value", e); }
+                // Ensure ageValue is an object with min/max before proceeding
+                if (ageValue && typeof ageValue.min === 'number' && typeof ageValue.max === 'number') {
+                    if (ageValue.min === 0 && ageValue.max === 99) { // "Any Age" selected
+                        // Remove age filters if "Any Age" is chosen
+                        delete updatedFilters.minAge;
+                        delete updatedFilters.maxAge;
+                    } else {
+                        // Set specific min/max age filters
+                        updatedFilters.minAge = ageValue.min;
+                        updatedFilters.maxAge = ageValue.max;
+                    }
+                } else {
+                     console.warn("Invalid age range value received:", value);
+                }
+             } catch(e) {
+                console.error("Error parsing age range value:", value, e);
+             }
 
+        // --- Handle Stimulation Score Range Sliders ---
         } else if (name === 'stimScoreMin' || name === 'stimScoreMax') {
             const newValue = parseInt(value, 10);
-            updatedFilters[name] = newValue;
+            // Only update if the parsed value is a valid number
+            if (!isNaN(newValue)) {
+                 updatedFilters[name] = newValue;
 
-            // Ensure min <= max logic (as before)
-            const currentMin = parseInt(updatedFilters.stimScoreMin || filters.stimScoreMin || '1', 10);
-            const currentMax = parseInt(updatedFilters.stimScoreMax || filters.stimScoreMax || '5', 10);
-            if (name === 'stimScoreMin' && newValue > currentMax) {
-                updatedFilters.stimScoreMax = newValue;
-            } else if (name === 'stimScoreMax' && newValue < currentMin) {
-                updatedFilters.stimScoreMin = newValue;
-            }
+                 // Ensure min score is always less than or equal to max score
+                 const currentMin = parseInt(updatedFilters.stimScoreMin || filters.stimScoreMin || '1', 10);
+                 const currentMax = parseInt(updatedFilters.stimScoreMax || filters.stimScoreMax || '5', 10);
+
+                 if (name === 'stimScoreMin' && newValue > currentMax) {
+                     // If new min is greater than current max, set max to the new min
+                     updatedFilters.stimScoreMax = newValue;
+                 } else if (name === 'stimScoreMax' && newValue < currentMin) {
+                      // If new max is less than current min, set min to the new max
+                     updatedFilters.stimScoreMin = newValue;
+                 }
+             }
+        // --- Handle Other Select Dropdowns (Interactivity, Dialogue, Scene Frequency) ---
         } else {
-            // Handle selects/dropdowns
-            if (value === '') { // If "Any" is selected
+            // If the selected value is empty (e.g., the "-- Any --" option), remove the filter key
+            if (value === '') {
                  delete updatedFilters[name];
             } else {
+                // Otherwise, set the filter key to the selected value
                 updatedFilters[name] = value;
             }
         }
@@ -153,12 +174,17 @@ const FilterPanelComponent = ({ filters = {}, onFilterChange, searchInputValue, 
                 </div>
             </div>
 
-            {/* 3. Themes Checkboxes */}
-            <div>
+                        {/* 3. Themes Checkboxes */}
+                        <div> {/* This is the main container for the Themes filter */}
                 <label className="block text-sm font-medium text-gray-700 mb-1">Themes</label>
                 <div className="max-h-40 overflow-y-auto border border-gray-200 rounded p-2 space-y-1 bg-gray-50">
                     {themesLoading ? (
-                        <p className="text-xs text-gray-500 italic">Loading themes...</p>
+                        /* Skeleton Loader for Themes */
+                        <div className="space-y-2 animate-pulse">
+                            <div className="h-4 bg-gray-300 rounded w-3/4"></div>
+                            <div className="h-4 bg-gray-300 rounded w-1/2"></div>
+                            <div className="h-4 bg-gray-300 rounded w-5/6"></div>
+                        </div>
                     ) : availableThemes.length > 0 ? availableThemes.map(theme => (
                         <div key={theme} className="flex items-center">
                             <input
@@ -176,8 +202,9 @@ const FilterPanelComponent = ({ filters = {}, onFilterChange, searchInputValue, 
                             </label>
                         </div>
                     )) : <p className="text-xs text-gray-500 italic">No themes available.</p>}
-                 </div>
-            </div>
+                 </div> {/* This closes the inner scrollable div */}
+            </div> {/* This closes the main container div for the Themes filter */}
+
 
              {/* 4. Interaction Level Dropdown */}
             <div>

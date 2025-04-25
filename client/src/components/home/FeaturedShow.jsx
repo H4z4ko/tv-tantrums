@@ -10,7 +10,8 @@ const FeaturedShow = ({ show }) => {
         return <div className="text-center p-6 bg-gray-100 rounded-lg">Loading featured show...</div>;
     }
 
-    const imageUrl = show.image_filename ? `/images/${show.image_filename}` : placeholderImage;
+    // Optional change: Try loading .webp first by default
+const imageUrl = show.image_filename ? `/images/${show.image_filename.replace(/\.(jpg|jpeg|png)$/i, '.webp')}` : placeholderImage;
 
     // Create a short description snippet (example)
     const descriptionSnippet = show.animation_style
@@ -28,7 +29,20 @@ const FeaturedShow = ({ show }) => {
                         alt={`${show.title} poster`}
                         className="rounded-lg shadow-lg w-full h-auto object-contain max-h-80" // Adjusted styles
                         loading="lazy" // Keep lazy loading
-                        onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }}
+                        onError={(e) => {
+                            // Attempt to load original filename if the current source (potentially .webp) failed
+                            const originalImageUrl = show.image_filename ? `/images/${show.image_filename}` : placeholderImage;
+                            if (e.target.src !== originalImageUrl) {
+                                // If the current src isn't the original, try loading the original
+                                console.log(`FeaturedShow: WebP failed for ${show.title}, trying original: ${originalImageUrl}`);
+                                e.target.src = originalImageUrl;
+                            } else {
+                                // If even the original failed, or if there was no original, use placeholder
+                                console.log(`FeaturedShow: Original image failed or missing for ${show.title}, using placeholder.`);
+                                e.target.onerror = null; // Prevent infinite loop if placeholder also fails
+                                e.target.src = placeholderImage;
+                            }
+                        }}
                     />
                 </div>
                 {/* Details */}

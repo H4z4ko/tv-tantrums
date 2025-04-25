@@ -150,9 +150,13 @@ router.get('/', async (req, res) => {
             limit: limitNum
         });
     } catch (error) {
-        console.error("Error in GET /api/shows:", error.message); // Keep essential error logs
-        res.status(500).json({ error: "Failed to retrieve shows from database." });
-    }
+        console.error(`Error in GET ${req.originalUrl} (ID: ${id}):`, error.message);
+        // console.error(error.stack); // Uncomment for full stack trace
+        // Determine status code based on error type
+        const statusCode = error.message.includes("not found") ? 404 : 500;
+        const userMessage = statusCode === 404 ? `Show with ID ${id} not found.` : "Failed to retrieve show from database.";
+        res.status(statusCode).json({ error: userMessage });
+     }
 });
 
 // GET /api/shows/title/:title - Get show by exact title
@@ -168,9 +172,10 @@ router.get('/title/:title', async (req, res) => {
         } else {
             res.status(404).json({ error: `Show with title "${title}" not found.` });
         }
-    } catch (error) {
-        console.error(`Error fetching show by title "${title}":`, error.message);
-        res.status(500).json({ error: "Failed to retrieve show from database." });
+    }catch (error) {
+        console.error(`Error in GET ${req.originalUrl} (IDs: ${ids?.join(',') || 'N/A'}):`, error.message);
+        // console.error(error.stack); // Uncomment for full stack trace
+        res.status(500).json({ error: "Failed to retrieve shows for comparison." }); // Keep generic user message
     }
 });
 

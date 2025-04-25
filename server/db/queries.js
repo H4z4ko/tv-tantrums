@@ -9,7 +9,7 @@ function runQuery(sql, params = []) {
             db.all(sql, params, (err, rows) => {
                 if (err) {
                     console.error(`Error running query: ${sql}`, params, err.message);
-                    reject(new Error(`Database query failed: ${err.message}`)); // More generic error
+                    reject(new Error('Database query error')); // Original error logged above
                 } else {
                     resolve(rows); // Resolve with array of rows
                 }
@@ -28,7 +28,7 @@ function getSingleRow(sql, params = []) {
             db.get(sql, params, (err, row) => {
                 if (err) {
                     console.error(`Error getting single row: ${sql}`, params, err.message);
-                    reject(new Error(`Database query failed: ${err.message}`));
+                    reject(new Error('Database query error')); // Original error logged above
                 } else {
                     resolve(row); // row is undefined if not found
                 }
@@ -48,7 +48,7 @@ function runAction(sql, params = []) {
              db.run(sql, params, function(err) {
                  if (err) {
                      console.error(`Error running action query: ${sql}`, params, err.message);
-                     reject(new Error(`Database action failed: ${err.message}`));
+                     reject(new Error('Database action error')); // Original error logged above
                  } else {
                      // Resolve with info about the action
                      resolve({ lastID: this.lastID, changes: this.changes });
@@ -86,7 +86,7 @@ async function getThemesForShows(showIds) {
     } catch (error) {
         console.error("Error fetching themes for multiple shows:", error.message);
         // Re-throw or handle more gracefully depending on need
-        throw error; // Propagate error up
+        throw new Error('Failed to fetch themes for shows'); // Original error logged above
     }
 }
 
