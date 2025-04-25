@@ -1,8 +1,8 @@
-// client/src/components/Catalog/FilterPanel.jsx
-import React, { useState, useEffect } from 'react'; // Keep React and hooks import
-import { getThemes } from '../../services/showService'; // Keep service import
+// client/src/components/catalog/FilterPanel.jsx
+import React, { useState, useEffect } from 'react'; // Standard React imports
+import { getThemes } from '../../services/showService'; // To fetch the list of themes
 
-// --- Constants defined OUTSIDE the component ---
+// --- Constants defined OUTSIDE the component (Makes them reusable and keeps component clean) ---
 const ageRanges = [
     { label: 'Any Age', value: { min: 0, max: 99 } },
     { label: 'Toddler (0-2)', value: { min: 0, max: 2 } },
@@ -14,15 +14,22 @@ const ageRanges = [
 const interactionLevels = ['High', 'Moderate', 'Low-Moderate', 'Low'];
 const dialogueIntensities = ['High', 'Moderate-High', 'Moderate', 'Low-Moderate', 'Low', 'Very Low', 'None'];
 const sceneFrequencies = ['Very High', 'High', 'Moderate', 'Low', 'Very Low'];
-// Remove the old hardcoded themeOptions array if you want, or keep for fallback
 
 // --- Component Definition ---
-const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept props, provide default for filters
+// We define the component's logic here.
+// It receives properties (props) from its parent (CatalogPage):
+// - filters: The current filter values (except search) derived from the URL
+// - onFilterChange: A function to call when a NON-search filter changes
+// - searchInputValue: The current text typed into the search box
+// - onSearchInputChange: A function to call specifically when the search box text changes
+const FilterPanelComponent = ({ filters = {}, onFilterChange, searchInputValue, onSearchInputChange }) => {
+    // console.log("Rendering FilterPanel. Filters:", filters, "SearchVal:", searchInputValue); // For debugging if needed
 
-    // --- Hooks called INSIDE the component ---
+    // State for loading themes list
     const [availableThemes, setAvailableThemes] = useState([]);
     const [themesLoading, setThemesLoading] = useState(true);
 
+    // Effect to fetch themes when the component first loads
     useEffect(() => {
         const fetchThemes = async () => {
             try {
@@ -31,100 +38,95 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                 setAvailableThemes(themesData || []);
             } catch (error) {
                 console.error("Error fetching themes for filter:", error);
+                // Optionally show an error message to the user here
             } finally {
                 setThemesLoading(false);
             }
         };
         fetchThemes();
-    }, []); // Empty dependency array - fetch themes only once
+    }, []); // Empty array means this runs only once on mount
 
-    // --- Event Handler ---
+    // --- Event Handler for NON-Search Filters ---
+    // This function runs when you change things like Age Range, Themes checkboxes, dropdowns, sliders
     const handleChange = (event) => {
         const { name, value, type, checked } = event.target;
-        let newFilters = { ...filters }; // Copy filters object from props
 
-        if (type === 'checkbox' && name === 'themes') { // Specific check for theme checkbox
-            const currentThemes = filters.themes ? filters.themes.split(',').filter(t=>t) : []; // Ensure array even if empty string
+        // Make a copy of the current filters (passed in via props)
+        // Exclude 'search' as it's handled separately by onSearchInputChange
+        const currentNonSearchFilters = { ...filters };
+        delete currentNonSearchFilters.search;
+
+        let updatedFilters = { ...currentNonSearchFilters }; // Start with non-search filters
+
+        // Logic for handling different types of inputs
+        if (type === 'checkbox' && name === 'themes') {
+            const currentThemes = filters.themes ? filters.themes.split(',').filter(t => t) : [];
             if (checked) {
-                newFilters.themes = [...currentThemes, value].join(',');
+                updatedFilters.themes = [...currentThemes, value].join(',');
             } else {
-                newFilters.themes = currentThemes.filter(theme => theme !== value).join(',');
+                updatedFilters.themes = currentThemes.filter(theme => theme !== value).join(',');
             }
-            // Ensure empty string if no themes are selected
-             if (newFilters.themes === '') delete newFilters.themes; // Remove key if empty for cleaner filter object
-
+            if (!updatedFilters.themes) delete updatedFilters.themes; // Remove key if empty
 
         } else if (name === 'ageRange') {
              try {
                 const ageValue = JSON.parse(value);
-                // Only include min/max age if not 'Any Age'
-                 if (ageValue.min === 0 && ageValue.max === 99) {
-                     delete newFilters.minAge;
-                     delete newFilters.maxAge;
+                 if (ageValue.min === 0 && ageValue.max === 99) { // "Any Age" selected
+                     delete updatedFilters.minAge;
+                     delete updatedFilters.maxAge;
                  } else {
-                    newFilters.minAge = ageValue.min;
-                    newFilters.maxAge = ageValue.max;
+                    updatedFilters.minAge = ageValue.min;
+                    updatedFilters.maxAge = ageValue.max;
                  }
              } catch(e) { console.error("Error parsing age value", e); }
 
-        } else if  (name === 'stimScoreMin' || name === 'stimScoreMax') {
-            // Handle sliders - update the specific min or max
-            const newValue = parseInt(value, 10); // Ensure value is integer
-            newFilters[name] = newValue;
-   
-            // Add validation: Ensure min <= max
-            const currentMin = parseInt(newFilters.stimScoreMin || filters.stimScoreMin || '1', 10);
-            const currentMax = parseInt(newFilters.stimScoreMax || filters.stimScoreMax || '5', 10);
-   
-            if (name === 'stimScoreMin' && newValue > currentMax) {
-                // If new min is greater than current max, set max to new min
-                newFilters.stimScoreMax = newValue;
-            } else if (name === 'stimScoreMax' && newValue < currentMin) {
-                // If new max is less than current min, set min to new max
-                newFilters.stimScoreMin = newValue;
-            }
-            // Convert back to string if necessary, though numbers should be fine for state
-            // newFilters.stimScoreMin = String(newFilters.stimScoreMin);
-            // newFilters.stimScoreMax = String(newFilters.stimScoreMax);
-   
-        } else { // ... rest of the function
+        } else if (name === 'stimScoreMin' || name === 'stimScoreMax') {
+            const newValue = parseInt(value, 10);
+            updatedFilters[name] = newValue;
 
-        }  {
-            // Handle text input and selects
-            if (value === '') {
-                 // If a dropdown is set back to "Any" (empty value), remove the filter key
-                 delete newFilters[name];
+            // Ensure min <= max logic (as before)
+            const currentMin = parseInt(updatedFilters.stimScoreMin || filters.stimScoreMin || '1', 10);
+            const currentMax = parseInt(updatedFilters.stimScoreMax || filters.stimScoreMax || '5', 10);
+            if (name === 'stimScoreMin' && newValue > currentMax) {
+                updatedFilters.stimScoreMax = newValue;
+            } else if (name === 'stimScoreMax' && newValue < currentMin) {
+                updatedFilters.stimScoreMin = newValue;
+            }
+        } else {
+            // Handle selects/dropdowns
+            if (value === '') { // If "Any" is selected
+                 delete updatedFilters[name];
             } else {
-                newFilters[name] = value;
+                updatedFilters[name] = value;
             }
         }
 
-        // Call the handler passed from CatalogPage
-        if (onFilterChange) { // Check if the prop exists
-             onFilterChange(newFilters);
+        // Call the onFilterChange function (passed from CatalogPage)
+        // This tells CatalogPage about the changes to NON-search filters
+        if (onFilterChange) {
+             onFilterChange(updatedFilters);
         }
     };
 
-    // REMOVED old handleReset and handleThemeChange functions that used internal state
-
-    // --- JSX Rendering ---
+    // --- JSX Rendering (What the component looks like) ---
     return (
-        <div className="space-y-5">
-            {/* 1. Show Name */}
+        <div className="space-y-5 p-4 bg-white rounded-lg border border-gray-200 shadow-sm"> {/* Added some padding/styling */}
+
+            {/* 1. Show Name Input */}
             <div>
                 <label htmlFor="showName" className="block text-sm font-medium text-gray-700 mb-1">Show Name</label>
                 <input
                     type="text"
                     id="showName"
-                    name="search" // Name matches the filter key
-                    value={filters.search || ''} // Use value from props
-                    onChange={handleChange} // Use unified handler
+                    name="search" // HTML attribute, not directly used for filtering logic here
+                    value={searchInputValue} // Display the value from CatalogPage's local search state
+                    onChange={onSearchInputChange} // Call the specific handler from CatalogPage when typing
                     placeholder="Enter title..."
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-sm"
                 />
             </div>
 
-            {/* 2. Age Range */}
+            {/* 2. Age Range Radios */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Age Range</label>
                 <div className="space-y-1">
@@ -132,15 +134,15 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                         <div key={age.label} className="flex items-center">
                             <input
                                 id={`age-${age.label}`}
-                                name="ageRange"
+                                name="ageRange" // Used by `handleChange`
                                 type="radio"
                                 value={JSON.stringify(age.value)}
-                                // Check based on minAge/maxAge from props
+                                // Determine if checked based on `filters` prop from CatalogPage
                                 checked={
-                                    (filters.minAge === undefined && age.value.min === 0 && age.value.max === 99) || // Handle "Any Age" default
+                                    (filters.minAge === undefined && age.value.min === 0 && age.value.max === 99) ||
                                     (String(filters.minAge) === String(age.value.min) && String(filters.maxAge) === String(age.value.max))
                                 }
-                                onChange={handleChange}
+                                onChange={handleChange} // Use the generic handler for non-search filters
                                 className="h-4 w-4 text-teal-600 border-gray-300 focus:ring-teal-500"
                             />
                             <label htmlFor={`age-${age.label}`} className="ml-2 block text-sm text-gray-900">
@@ -151,39 +153,40 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                 </div>
             </div>
 
-            {/* 3. Themes */}
+            {/* 3. Themes Checkboxes */}
             <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Themes</label>
                 <div className="max-h-40 overflow-y-auto border border-gray-200 rounded p-2 space-y-1 bg-gray-50">
                     {themesLoading ? (
-                        <p className="text-xs text-gray-500">Loading themes...</p>
+                        <p className="text-xs text-gray-500 italic">Loading themes...</p>
                     ) : availableThemes.length > 0 ? availableThemes.map(theme => (
                         <div key={theme} className="flex items-center">
                             <input
                                 id={`theme-${theme}`}
-                                name="themes" // Name matches the key updated in handleChange
+                                name="themes" // Used by `handleChange`
                                 type="checkbox"
                                 value={theme}
-                                checked={filters.themes ? filters.themes.split(',').includes(theme) : false} // Check based on props
-                                onChange={handleChange} // Use unified handler
+                                // Determine if checked based on `filters` prop from CatalogPage
+                                checked={filters.themes ? filters.themes.split(',').includes(theme) : false}
+                                onChange={handleChange} // Use the generic handler
                                 className="h-4 w-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
                             />
                             <label htmlFor={`theme-${theme}`} className="ml-2 block text-sm text-gray-900">
                                 {theme}
                             </label>
                         </div>
-                    )) : <p className="text-xs text-gray-500">No themes available.</p>}
+                    )) : <p className="text-xs text-gray-500 italic">No themes available.</p>}
                  </div>
             </div>
 
-             {/* 4. Interaction Level */}
+             {/* 4. Interaction Level Dropdown */}
             <div>
                 <label htmlFor="interactionLevel" className="block text-sm font-medium text-gray-700 mb-1">Interaction Level</label>
                 <select
                     id="interactionLevel"
-                    name="interactivity" // Name matches the filter key
-                    value={filters.interactivity || ''} // Use value from props
-                    onChange={handleChange} // Use unified handler
+                    name="interactivity" // Used by `handleChange`, corresponds to filter key
+                    value={filters.interactivity || ''} // Display value based on `filters` prop
+                    onChange={handleChange} // Use the generic handler
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white"
                     title="How much the show prompts viewer interaction..."
                 >
@@ -194,14 +197,14 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                 </select>
             </div>
 
-            {/* 5. Dialogue Intensity */}
+            {/* 5. Dialogue Intensity Dropdown */}
              <div>
                 <label htmlFor="dialogueIntensity" className="block text-sm font-medium text-gray-700 mb-1">Dialogue Intensity</label>
                 <select
                     id="dialogueIntensity"
-                    name="dialogue" // Name matches the filter key
-                    value={filters.dialogue || ''} // Use value from props
-                    onChange={handleChange} // Use unified handler
+                    name="dialogue" // Used by `handleChange`
+                    value={filters.dialogue || ''} // Display value based on `filters` prop
+                    onChange={handleChange} // Use the generic handler
                     className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white"
                     title="Amount and pace of talking..."
                 >
@@ -212,14 +215,14 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                 </select>
             </div>
 
-             {/* 6. Scene Frequency */}
+             {/* 6. Scene Frequency Dropdown */}
              <div>
                 <label htmlFor="sceneFrequency" className="block text-sm font-medium text-gray-700 mb-1">Scene Frequency</label>
                 <select
                     id="sceneFrequency"
-                    name="sceneFreq" // Name matches the filter key
-                    value={filters.sceneFreq || ''} // Use value from props
-                    onChange={handleChange} // Use unified handler
+                    name="sceneFreq" // Used by `handleChange`
+                    value={filters.sceneFreq || ''} // Display value based on `filters` prop
+                    onChange={handleChange} // Use the generic handler
                      className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-1 focus:ring-teal-500 focus:border-teal-500 text-sm bg-white"
                     title="How quickly scenes change..."
                 >
@@ -230,7 +233,7 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                 </select>
             </div>
 
-             {/* 7. Stimulation Score */}
+             {/* 7. Stimulation Score Sliders */}
              <div className="space-y-2">
                  <label className="block text-sm font-medium text-gray-700">
                      Stimulation Score Range
@@ -238,38 +241,42 @@ const FilterPanel = ({ filters = {}, onFilterChange, onReset }) => { // Accept p
                  {/* Min Score */}
                  <div className='pl-2'>
                       <label htmlFor="stimScoreMin" className="block text-xs font-medium text-gray-700 mb-1">
-                         Min: {filters.stimScoreMin || 1}
+                         Min: {filters.stimScoreMin || 1} {/* Display value based on `filters` prop */}
                      </label>
                      <input
                          type="range"
                          id="stimScoreMin"
-                         name="stimScoreMin"
+                         name="stimScoreMin" // Used by `handleChange`
                          min="1" max="5" step="1"
-                         value={filters.stimScoreMin || '1'} // Use value from props
-                         onChange={handleChange} // Use unified handler
+                         value={filters.stimScoreMin || '1'} // Display value based on `filters` prop
+                         onChange={handleChange} // Use the generic handler
                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
                      />
                  </div>
                   {/* Max Score */}
                  <div className='pl-2'>
                       <label htmlFor="stimScoreMax" className="block text-xs font-medium text-gray-700 mb-1">
-                         Max: {filters.stimScoreMax || 5}
+                         Max: {filters.stimScoreMax || 5} {/* Display value based on `filters` prop */}
                      </label>
                      <input
                          type="range"
                          id="stimScoreMax"
-                         name="stimScoreMax"
+                         name="stimScoreMax" // Used by `handleChange`
                          min="1" max="5" step="1"
-                         value={filters.stimScoreMax || '5'} // Use value from props
-                         onChange={handleChange} // Use unified handler
+                         value={filters.stimScoreMax || '5'} // Display value based on `filters` prop
+                         onChange={handleChange} // Use the generic handler
                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer accent-teal-600"
                      />
                  </div>
              </div>
 
-            {/* Reset button is now handled in CatalogPage */}
+            {/* Reset button is handled in CatalogPage, not here */}
         </div>
     );
 };
 
-export default FilterPanel;
+// Wrap the component with React.memo for performance optimization.
+// This prevents re-rendering if the props haven't changed.
+const FilterPanel = React.memo(FilterPanelComponent);
+
+export default FilterPanel; // Export the optimized version

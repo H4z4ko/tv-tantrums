@@ -209,7 +209,7 @@
     "title": "Amakandu",
     "stimulation_score": 1,
     "platform": "YouTube",
-    "target_age_group": "Any",
+    "target_age_group": "2+",
     "seasons": null,
     "avg_episode_length": null,
     "themes": [
@@ -853,7 +853,8 @@
       "Problem Solving",
       "Friendship",
       "Teamwork",
-      "Repetitive Learning"
+      "Repetitive Learning",
+      "Construction"
     ],
     "interactivity_level": "Low-Moderate",
     "animation_style": "Traditional Stop-Motion animation",
@@ -877,7 +878,8 @@
       "Problem Solving",
       "Friendship",
       "Teamwork",
-      "Repetitive Learning"
+      "Repetitive Learning",
+      "Construction"
     ],
     "interactivity_level": "Low-Moderate",
     "animation_style": "3D CGI animation",
@@ -952,7 +954,7 @@
     "title": "Brain Candy TV",
     "stimulation_score": 5,
     "platform": "YouTube",
-    "target_age_group": "Any",
+    "target_age_group": "2+",
     "seasons": null,
     "avg_episode_length": null,
     "themes": [
@@ -1394,7 +1396,7 @@
     "title": "CoasterFan2105",
     "stimulation_score": 3,
     "platform": "YouTube",
-    "target_age_group": "Any",
+    "target_age_group": "2+",
     "seasons": null,
     "avg_episode_length": null,
     "themes": [
@@ -3416,7 +3418,7 @@
     "title": "LifeKids (Blinky’s Bible adventures)",
     "stimulation_score": 2,
     "platform": "YouTube",
-    "target_age_group": "Any",
+    "target_age_group": "2+",
     "seasons": null,
     "avg_episode_length": null,
     "themes": [
@@ -3868,7 +3870,7 @@
     "title": "Minuscule",
     "stimulation_score": 1,
     "platform": "YouTube",
-    "target_age_group": "2+, Any",
+    "target_age_group": "2+",
     "seasons": null,
     "avg_episode_length": null,
     "themes": [
@@ -4835,7 +4837,7 @@
     "total_music_level": "Moderate",
     "total_sound_effect_time_level": "Moderate",
     "scene_frequency": "Moderate",
-    "image_filename": "peter-rabbit-(2012-2016).jpg"
+    "image_filename": "peter-rabbit(2012-2016).jpg"
   },
   {
     "title": "Phineas and Ferb",
@@ -5127,7 +5129,7 @@
     "total_music_level": "Moderate",
     "total_sound_effect_time_level": "Low-Moderate",
     "scene_frequency": "Low-Moderate",
-    "image_filename": "postman-pat-(1981-2008).jpg"
+    "image_filename": "postman-pat-(1981–2008).jpg"
   },
   {
     "title": "Postman Pat: Special Delivery Service (2008–2017)",
@@ -5151,7 +5153,7 @@
     "total_music_level": "High",
     "total_sound_effect_time_level": "High",
     "scene_frequency": "High",
-    "image_filename": "postman-pat-special-delivery-service-(2008-2017).jpg"
+    "image_filename": "postman-pat-special-delivery-service.jpg"
   },
   {
     "title": "Puffin Rock",
@@ -5285,7 +5287,7 @@
     "title": "RC Action Channel",
     "stimulation_score": 2,
     "platform": "YouTube",
-    "target_age_group": "2+, Any",
+    "target_age_group": "2+",
     "seasons": null,
     "avg_episode_length": null,
     "themes": [
@@ -5685,7 +5687,7 @@
     "total_music_level": "High",
     "total_sound_effect_time_level": "Moderate-High",
     "scene_frequency": "Low",
-    "image_filename": "scooby-doo-where-are-you-(1969-1970).jpg"
+    "image_filename": "scooby-doo-(1969-1970).jpg"
   },
   {
     "title": "Sea of love",
@@ -5741,7 +5743,7 @@
     "total_music_level": "High",
     "total_sound_effect_time_level": "Low",
     "scene_frequency": "Low-Moderate",
-    "image_filename": "sesame-street-(1969-present).jpg"
+    "image_filename": "sesame-street-(1969-present).jpeg"
   },
   {
     "title": "Shaun the Sheep",
@@ -7751,7 +7753,7 @@
     "total_music_level": "High",
     "total_sound_effect_time_level": "Moderate",
     "scene_frequency": "Moderate",
-    "image_filename": "veggietales-in-the-house-(2014-2016)"
+    "image_filename": "veggietales-in-the-house.jpg"
   },
   {
     "title": "Vlad and Nikki",
@@ -7892,7 +7894,7 @@
     "total_music_level": "High",
     "total_sound_effect_time_level": "High",
     "scene_frequency": "Moderate",
-    "image_filename": "whats-new-scooby-doo-(2002–2006).jpeg"
+    "image_filename": "whats-new-scooby-doo.jpeg"
   },
   {
     "title": "Wishenpoof",

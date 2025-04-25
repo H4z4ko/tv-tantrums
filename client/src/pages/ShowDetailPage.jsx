@@ -8,7 +8,7 @@ import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearSca
 
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
-const placeholderImage = "/images/placeholder-show.png";
+const placeholderImage = "/images/sstc.jpg";
 
 const ShowDetailPage = () => {
     const { id } = useParams();
@@ -148,6 +148,7 @@ const ShowDetailPage = () => {
                         alt={`${show.title} primary image`}
                         className="rounded-lg shadow-md w-full object-contain mb-3 bg-gray-100"
                         onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }}
+                        loading="lazy"
                      />
                 </div>
                 <div className="md:w-2/3">
@@ -207,7 +208,7 @@ const ShowDetailPage = () => {
              {/* Interaction Level & Narrative Summary */}
              <div className="space-y-6">
                  <div className="border p-4 rounded-lg shadow-sm bg-teal-50">
-                     <h2 className="text-xl font-semibold mb-2 text- teal-700">Interaction Level: {show.interactivity_level || 'N/A'}</h2>
+                     <h2 className="text-xl font-semibold mb-2 text-teal-700">Interaction Level: {show.interactivity_level || 'N/A'}</h2>
                      <p className="text-gray-700">{getInteractionExplanation(show.interactivity_level)}</p>
                  </div>
                  <div className="border p-4 rounded-lg shadow-sm">

@@ -241,3 +241,34 @@ export const getHomepageData = async () => {
         throw new Error(errorMessage);
     }
 };
+
+// Add this new function in client/src/services/showService.js
+
+/**
+ * Fetches the complete list of show IDs and titles for dropdowns.
+ * @returns {Promise<Array<{id: number, title: string}>>} An array of show objects with id and title.
+ * @throws {Error} Throws an error if the fetch fails.
+ */
+export const getShowList = async () => {
+    console.log(">>> Service: getShowList called.");
+    try {
+        const response = await axios.get(`${API_BASE_URL}/show-list`);
+        if (response && Array.isArray(response.data)) {
+            return response.data;
+        } else {
+            console.warn("Received non-array response from /api/show-list");
+            return []; // Return empty array if data is not an array
+        }
+    } catch (error) {
+        console.error("Error fetching show list in showService:", error);
+        let errorMessage = "An unknown error occurred while fetching the show list.";
+        if (error.response) {
+            errorMessage = error.response.data?.error || `Server error: ${error.response.status}`;
+        } else if (error.request) {
+            errorMessage = "No response received from server for show list.";
+        } else {
+            errorMessage = error.message || errorMessage;
+        }
+        throw new Error(errorMessage);
+    }
+};
