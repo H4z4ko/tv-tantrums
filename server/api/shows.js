@@ -120,6 +120,13 @@ router.get('/', async (req, res) => {
 
     try {
         // --- Execute Queries Concurrently ---
+        if (queryParams.length > 2 || countParams.length > 0) { // Log if more than just limit/offset or if count has params
+            console.log(`Executing Show Query: ${query}`);
+            console.log(`Show Query Params:`, queryParams);
+            console.log(`Executing Count Query: ${countQuery}`);
+            console.log(`Count Query Params:`, countParams);
+       }
+       
         const [totalResult, showsResult] = await Promise.all([
             getSingleRow(countQuery, countParams), // Fetch total count
             runQuery(query, queryParams) // Fetch shows for the current page
