@@ -3,86 +3,99 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import ScoreVisual from '../shared/ScoreVisual';
 
-const placeholderImage = "/images/placeholder-show.png";
+// Placeholder image path (relative to public directory)
+const placeholderImage = "/images/placeholder-show.png"; // Ensure this placeholder exists
 
-// Define the component function as before
 const ShowCardComponent = ({ show }) => {
-    // console.log(`Rendering ShowCard for ID: ${show?.id}`);
-
     // Gracefully handle invalid show prop before destructuring
     if (!show || typeof show !== 'object' || !show.id) {
         console.error("ShowCard received invalid show prop:", show);
-        return <div className="border border-red-300 p-2 text-red-600 text-xs">Invalid Show Data</div>;
+        return (
+            <div className="border border-red-300 p-3 text-red-600 text-xs rounded-lg shadow-md bg-white overflow-hidden flex flex-col">
+                Invalid Show Data Provided. Cannot render card.
+            </div>
+        );
     }
 
-    // *** ADD THIS DESTRUCTURING ASSIGNMENT ***
-    // Extract needed properties from the 'show' object, providing default values
+    // Destructure needed properties, providing default values for safety
     const {
         id,
-        title = "Unknown Title", // Default if title is missing
-        target_age_group = "N/A", // Default if target_age_group is missing
-        themes = [], // Default to empty array if themes is missing or not an array
-        stimulation_score = 0, // Default if stimulation_score is missing
-        image_filename = null // Default if image_filename is missing
+        title = "Unknown Title",
+        target_age_group = "N/A",
+        themes = [], // Default to empty array
+        stimulation_score = 0,
+        image_filename = null
     } = show;
-    // *** END DESTRUCTURING ASSIGNMENT ***
 
-    // Now 'title', 'id', etc., are defined variables we can use
+    // Image URL Logic (WebP first, then original, then placeholder)
+    const webpImageUrl = image_filename ? `/images/${image_filename.replace(/\.(jpg|jpeg|png)$/i, '.webp')}` : placeholderImage;
+    const originalImageUrl = image_filename ? `/images/${image_filename}` : placeholderImage;
 
-    // Use the extracted image_filename variable
-    const imageUrl = image_filename ? `/images/${image_filename.replace(/\.(jpg|jpeg|png)$/i, '.webp')}` : placeholderImage;
-    // Ensure themes is an array before slicing (already handled by default in destructuring)
-    const displayedThemes = themes.slice(0, 3); // Max 3 themes displayed on card
+    // Limit themes displayed on the card
+    const MAX_THEMES_DISPLAYED = 3;
+    const displayedThemes = Array.isArray(themes) ? themes.slice(0, MAX_THEMES_DISPLAYED) : [];
+    const hasMoreThemes = Array.isArray(themes) && themes.length > MAX_THEMES_DISPLAYED;
 
     return (
-        <div className="border border-gray-200 rounded-lg shadow-md bg-white overflow-hidden flex flex-col transition duration-200 hover:shadow-lg">
-            {/* Image */}
-            <div className="w-full h-40 bg-gray-200 flex items-center justify-center">
-                <img
-                    src={imageUrl}
-                    alt={`${title} poster`} // Now 'title' is defined
-                    className="w-full h-full object-cover"
-                    onError={(e) => {
-                         // Use extracted image_filename here too
-                         const originalImageUrl = image_filename ? `/images/${image_filename}` : placeholderImage;
-                         if (e.target.src !== originalImageUrl) {
-                            e.target.src = originalImageUrl;
-                         } else {
-                            e.target.onerror = null;
-                            e.target.src = placeholderImage;
-                         }
-                    }}
-                    loading="lazy"
-                />
+        <div className="border border-gray-200 rounded-lg shadow-md bg-white overflow-hidden flex flex-col transition-shadow duration-200 hover:shadow-lg h-full group"> {/* Added h-full & group */}
+
+            {/* Image Container */}
+            <div className="w-full h-48 bg-gray-100 relative overflow-hidden"> {/* Fixed height, relative positioning */}
+                <Link to={`/show/${id}`} className="absolute inset-0" aria-label={`View details for ${title}`}> {/* Link covers image */}
+                    <img
+                        src={webpImageUrl}
+                        alt={`${title} poster`}
+                        className="w-full h-full object-cover transition-transform duration-300 ease-in-out group-hover:scale-105" // Smooth transition on hover
+                        onError={(e) => {
+                            // Fallback logic
+                            if (e.target.src !== originalImageUrl && originalImageUrl !== placeholderImage) {
+                                e.target.src = originalImageUrl;
+                            } else if (e.target.src !== placeholderImage) {
+                                e.target.onerror = null;
+                                e.target.src = placeholderImage;
+                            }
+                        }}
+                        loading="lazy"
+                    />
+                </Link>
             </div>
-            {/* Details */}
-            <div className="p-4 flex flex-col flex-grow">
-                 {/* Use extracted variables */}
-                 <h3 className="text-lg font-semibold mb-1 text-gray-800 truncate" title={title}>{title}</h3>
-                 <p className="text-sm text-gray-500 mb-2">Age: {target_age_group}</p>
-                 <div className="mb-3 flex flex-wrap gap-1 min-h-[20px]">
+
+            {/* Details Section */}
+            <div className="p-4 flex flex-col flex-grow"> {/* Padding, flex-grow pushes button down */}
+                 {/* Title (Truncated) */}
+                 <h3 className="text-lg font-semibold mb-1 text-gray-800 truncate" title={title}>
+                     <Link to={`/show/${id}`} className="hover:text-teal-700 transition duration-150 focus:outline-none focus:underline">
+                        {title}
+                     </Link>
+                 </h3>
+
+                 {/* Age Group */}
+                 <p className="text-sm text-gray-600 mb-2">Age: {target_age_group}</p>
+
+                 {/* Themes */}
+                 <div className="mb-3 flex flex-wrap gap-1 min-h-[24px]"> {/* Min height to prevent jump */}
                     {displayedThemes.length > 0 ? displayedThemes.map((theme, index) => (
-                        <span key={index} className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full">
+                        <span key={index} className="text-xs bg-teal-100 text-teal-800 px-2 py-0.5 rounded-full whitespace-nowrap">
                             {theme}
                         </span>
                     )) : (
                         <span className="text-xs text-gray-400 italic">No themes listed</span>
                     )}
-                    {/* Check original themes length before showing ellipsis */}
-                    {Array.isArray(show.themes) && show.themes.length > 3 && (
-                        <span className="text-xs text-gray-400 px-2 py-0.5">...</span>
+                    {hasMoreThemes && (
+                        <span className="text-xs text-gray-400 px-1 py-0.5" title={`${themes.length - MAX_THEMES_DISPLAYED} more themes`}>...</span>
                     )}
                 </div>
+
+                 {/* Score */}
                  <div className="mb-4">
                      <ScoreVisual score={stimulation_score} />
                  </div>
 
-                {/* Learn More Button */}
-                <div className="mt-auto">
-                    {/* Use extracted id */}
+                {/* Learn More Button (Pushed to bottom) */}
+                <div className="mt-auto pt-2"> {/* Margin-top auto pushes this down, padding-top for space */}
                     <Link
                         to={`/show/${id}`}
-                        className="block w-full text-center px-4 py-2 bg-teal-600 text-white rounded hover:bg-teal-700 transition duration-200 text-sm"
+                        className="block w-full text-center px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 transition duration-200 text-sm font-medium shadow-sm hover:shadow-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-teal-500" // Added focus styles
                     >
                         Learn More
                     </Link>
@@ -92,7 +105,7 @@ const ShowCardComponent = ({ show }) => {
     );
 };
 
-// Wrap the component with React.memo (keep this)
+// Wrap the component with React.memo for performance optimization
 const ShowCard = React.memo(ShowCardComponent);
 
-export default ShowCard; // Export the memoized version
+export default ShowCard;

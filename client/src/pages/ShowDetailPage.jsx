@@ -1,231 +1,176 @@
 // client/src/pages/ShowDetailPage.jsx
-import React, { useState, useEffect, useMemo } from 'react'; // Added useMemo
+import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { getShowById } from '../services/showService';
-import { Pie } from 'react-chartjs-2';
-import { Bar } from 'react-chartjs-2';
-import { Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title } from 'chart.js';
+import ScoreVisual from '../components/shared/ScoreVisual'; // Import ScoreVisual
 
+// Import Chart.js components
+import { Pie, Bar } from 'react-chartjs-2';
+import {
+    Chart as ChartJS, ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title
+} from 'chart.js';
+
+// Register Chart.js components
 ChartJS.register(ArcElement, Tooltip, Legend, CategoryScale, LinearScale, BarElement, Title);
 
-const placeholderImage = "/images/sstc.jpg";
+// Placeholder image path
+const placeholderImage = "/images/placeholder-show.png"; // Make sure this exists
 
+// --- Helper Components ---
+const DetailItem = React.memo(({ label, value, children }) => (
+    <div className="mb-3 break-words">
+        <strong className="text-sm font-semibold text-gray-600 block">{label}:</strong>
+        {children ? <div className="text-base text-gray-800 mt-0.5">{children}</div>
+                  : <span className="text-base text-gray-800 mt-0.5">{value ?? <span className="text-gray-500 italic">N/A</span>}</span>}
+    </div>
+));
+
+const ThemeTags = React.memo(({ themes }) => {
+    if (!themes || themes.length === 0) return <span className="text-sm text-gray-500 italic">None listed</span>;
+    return (
+        <div className="flex flex-wrap gap-2 mt-1">
+            {themes.map((theme, index) => (
+                <span key={index} className="text-sm bg-teal-100 text-teal-800 px-3 py-1 rounded-full whitespace-nowrap">{theme}</span>
+            ))}
+        </div>
+    );
+});
+
+const InteractionExplanation = React.memo(({ level }) => {
+    let explanation = "Interaction level information not available.";
+    switch (level?.toLowerCase().trim()) {
+        case 'high': explanation = "Frequently asks questions or prompts viewers to participate (e.g., Blue's Clues, Dora)."; break;
+        case 'moderate': explanation = "Occasionally encourages participation or has interactive segments."; break;
+        case 'low-moderate': explanation = "Limited direct interaction, perhaps some songs or simple call-outs."; break;
+        case 'low': explanation = "Primarily passive viewing with little to no direct viewer interaction."; break;
+        case 'none': explanation = "No interactive elements are present in this show."; break;
+    }
+    return <p className="text-gray-700 text-sm mt-1">{explanation}</p>;
+});
+
+// --- Main Show Detail Page Component ---
 const ShowDetailPage = () => {
     const { id } = useParams();
     const [show, setShow] = useState(null);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState(null);
-    // Removed chart data state - will use memoized variables directly
-
-    console.log("Rendering ShowDetailPage (Memo Fix Attempt). isLoading:", isLoading, "Error:", error);
 
     // --- Fetch Show Data ---
     useEffect(() => {
-        console.log("ShowDetailPage (Memo Fix Attempt) Effect Running for ID:", id);
-        if (!id) {
-            setIsLoading(false);
-            setError("No Show ID provided.");
-            return;
+        const numericId = parseInt(id, 10);
+        if (!id || isNaN(numericId) || numericId <= 0) {
+            setError("Invalid Show ID provided."); setIsLoading(false); return;
         }
-        setIsLoading(true);
-        setError(null);
-        setShow(null); // Reset show data
+        setIsLoading(true); setError(null); setShow(null);
+        const controller = new AbortController();
 
-        getShowById(id)
-            .then(fetchedShowData => {
-                console.log("Fetched Show Detail Data:", fetchedShowData);
-                // ** Only set show data and loading state here **
-                setShow(fetchedShowData || null); // Set to null if fetch returns nothing
-                setIsLoading(false);
-            })
-            .catch(err => {
-                console.error("ShowDetailPage (Memo Fix Attempt) fetch error:", err);
-                setError(err.message || `Failed to load show with ID ${id}.`);
-                setShow(null);
-                setIsLoading(false);
-            });
+        getShowById(numericId)
+            .then(fetchedShowData => { if (!controller.signal.aborted) {
+                if (fetchedShowData) { setShow(fetchedShowData); }
+                else { setError(`Show with ID ${numericId} not found.`); }
+            }})
+            .catch(err => { if (!controller.signal.aborted) setError(err.message || `Failed to load show details.`); })
+            .finally(() => { if (!controller.signal.aborted) setIsLoading(false); });
 
-        return () => {
-            console.log("ShowDetailPage (Memo Fix Attempt) Effect Cleanup for ID:", id);
-        };
-    }, [id]); // Depend only on ID
+        return () => controller.abort();
+    }, [id]);
 
     // --- Prepare Chart Data using useMemo ---
-    const pieChartData = useMemo(() => {
-        if (!show) return null; // Return null if show data isn't loaded yet
-        console.log("Memoizing Pie Chart Data"); // Log memo calculation
-
-        const dialogueScore = show.dialogue_intensity_num ?? 0;
-        const sceneFreqScore = show.scene_frequency_num ?? 0;
-        const soundFxScore = show.sound_effects_level_num ?? 0;
-        const musicScore = show.total_music_level_num ?? 0;
-        const totalScoreSum = dialogueScore + sceneFreqScore + soundFxScore + musicScore;
-        let piePercentages = [0, 0, 0, 0];
-        if (totalScoreSum > 0) {
-            piePercentages = [
-                (dialogueScore / totalScoreSum) * 100,
-                (sceneFreqScore / totalScoreSum) * 100,
-                (soundFxScore / totalScoreSum) * 100,
-                (musicScore / totalScoreSum) * 100,
-            ];
-        }
-        return {
-            labels: ['Dialogue', 'Scene Freq.', 'Sound FX', 'Music'],
-            datasets: [{
-                label: 'Approx. Contribution by Factor Score',
-                data: piePercentages,
-                backgroundColor: [
-                    'rgba(255, 99, 132, 0.6)', 'rgba(54, 162, 235, 0.6)',
-                    'rgba(255, 206, 86, 0.6)', 'rgba(75, 192, 192, 0.6)'
-                ],
-                borderColor: '#ffffff', borderWidth: 1,
-            }]
+    const chartData = useMemo(() => {
+        if (!show) return { pieData: null, barData: null };
+        const factorScores = {
+            dialogue: show.dialogue_intensity_num ?? 0, sceneFreq: show.scene_frequency_num ?? 0,
+            soundFx: show.sound_effects_level_num ?? 0, music: show.total_music_level_num ?? 0,
         };
-    }, [show]); // Recalculate only when show data changes
+        const factorLabels = ['Dialogue', 'Scene Freq.', 'Sound FX', 'Music'];
+        const scoresArray = [factorScores.dialogue, factorScores.sceneFreq, factorScores.soundFx, factorScores.music];
+        const factorColors = ['rgba(54, 162, 235, 0.7)', 'rgba(255, 159, 64, 0.7)', 'rgba(255, 99, 132, 0.7)', 'rgba(75, 192, 192, 0.7)'];
+        const factorBorders = factorColors.map(c => c.replace('0.7', '1'));
 
-    const barChartData = useMemo(() => {
-        if (!show) return null; // Return null if show data isn't loaded yet
-        console.log("Memoizing Bar Chart Data"); // Log memo calculation
+        const totalScoreSum = scoresArray.reduce((sum, score) => sum + score, 0);
+        const piePercentages = totalScoreSum > 0 ? scoresArray.map(score => (score / totalScoreSum) * 100) : [0, 0, 0, 0];
+        const pieData = { labels: factorLabels, datasets: [{ label: 'Factor Contribution (%)', data: piePercentages, backgroundColor: factorColors, borderColor: '#ffffff', borderWidth: 1 }] };
+        const barData = { labels: factorLabels, datasets: [{ label: `Factor Scores (0-5)`, data: scoresArray, backgroundColor: factorColors, borderColor: factorBorders, borderWidth: 1 }] };
+        return { pieData, barData };
+    }, [show]);
 
-        return {
-            labels: ['Dialogue', 'Scene Freq.', 'Sound FX', 'Music'],
-            datasets: [{
-                label: show.title || 'This Show',
-                data: [
-                    show.dialogue_intensity_num ?? 0, show.scene_frequency_num ?? 0,
-                    show.sound_effects_level_num ?? 0, show.total_music_level_num ?? 0
-                ],
-                backgroundColor: 'rgba(54, 162, 235, 0.6)',
-                borderColor: 'rgba(54, 162, 235, 1)', borderWidth: 1,
-            }]
-        };
-    }, [show]); // Recalculate only when show data changes
-
-
-    // --- Chart Options (remain the same) ---
-    const chartOptions = {
-        responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: false } },
-    };
-    const barChartOptions = {
-        responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'top' }, title: { display: false } }, scales: { y: { beginAtZero: true, suggestedMax: 5, ticks: { stepSize: 1 } } }
-    };
-
+    // --- Chart Options ---
+    const commonChartOptions = useMemo(() => ({
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+            legend: { position: 'bottom', labels: { boxWidth: 12, padding: 15, font: {size: 11} } },
+            title: { display: false },
+            tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.toFixed(1)}%` } } // For Pie
+        },
+    }), []);
+    const barChartOptions = useMemo(() => ({
+        ...commonChartOptions, scales: { y: { beginAtZero: true, suggestedMax: 5, ticks: { stepSize: 1 } } },
+        plugins: { ...commonChartOptions.plugins, legend: { display: false }, tooltip: { callbacks: { label: ctx => `${ctx.label}: ${ctx.parsed.y}` } } } // For Bar
+    }), [commonChartOptions]);
 
     // --- Render Logic ---
-    if (isLoading) {
-        return <p className="text-center text-lg text-gray-600 py-10">Loading show details...</p>;
-    }
-    if (error) {
-        return <p className="text-center text-red-600 bg-red-100 p-4 rounded border border-red-300">{error}</p>;
-    }
-    if (!show) {
-         return <p className="text-center text-gray-500 py-10">Show data not available.</p>;
-    }
+    if (isLoading) return <p className="text-center text-lg text-gray-600 py-10 animate-pulse">Loading show details...</p>;
+    if (error) return ( <div className="max-w-4xl mx-auto bg-red-50 p-6 md:p-8 rounded-lg shadow-lg border border-red-300 text-center"> <p className="text-red-700 font-semibold mb-2">Error Loading Show</p> <p className="text-red-600">{error}</p> <Link to="/shows" className="mt-4 inline-block px-4 py-2 border border-red-600 text-red-600 rounded hover:bg-red-100 transition duration-200 text-sm"> ← Back to Catalog </Link> </div> );
+    if (!show) return ( <div className="max-w-4xl mx-auto text-center py-10"> <p className="text-gray-500 text-lg">Show data could not be displayed.</p> <Link to="/shows" className="mt-4 inline-block px-4 py-2 border border-gray-400 text-gray-600 rounded hover:bg-gray-100 transition duration-200 text-sm"> ← Back to Catalog </Link> </div> );
 
-    // Determine image URL
     const imageUrl = show.image_filename ? `/images/${show.image_filename}` : placeholderImage;
-
-    // Helper function (remains the same)
-    const getInteractionExplanation = (level) => {
-        switch (level?.toLowerCase()) {
-            case 'high': return "This show frequently asks questions or prompts viewers to participate (like Blue's Clues or Dora).";
-            case 'moderate': return "This show occasionally encourages participation or has interactive segments.";
-            case 'low-moderate': return "This show has limited direct interaction, perhaps some songs or simple call-outs.";
-            case 'low': return "This show is primarily passive viewing with little to no direct viewer interaction.";
-            default: return "Interaction level information not available.";
-        }
-    };
-
-
-    // --- JSX Output with Charts using memoized data ---
     return (
-        <div className="max-w-4xl mx-auto bg-white p-6 md:p-8 rounded-lg shadow-lg">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row gap-6 mb-8 border-b pb-6">
-                <div className="md:w-1/3 flex-shrink-0">
-                     <img
-                        src={imageUrl}
-                        alt={`${show.title} primary image`}
-                        className="rounded-lg shadow-md w-full object-contain mb-3 bg-gray-100"
-                        onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }}
-                        loading="lazy"
-                     />
-                </div>
-                <div className="md:w-2/3">
-                     <h1 className="text-3xl md:text-4xl font-bold text-teal-800 mb-2">{show.title}</h1>
-                    <p className="text-lg text-gray-600 mb-3">
-                        <strong>Age Range:</strong> {show.target_age_group}
-                    </p>
-                    <div className="mb-4">
-                        <strong className="text-gray-700">Themes:</strong>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                            {show.themes && show.themes.length > 0 ? show.themes.map((theme, index) => (
-                                <span key={index} className="text-sm bg-teal-100 text-teal-800 px-3 py-1 rounded-full">
-                                    {theme}
-                                </span>
-                            )) : <span className="text-sm text-gray-500 italic">None listed</span>}
-                        </div>
-                    </div>
-                     <p className="text-md text-gray-600">
-                         <strong>Platform:</strong> {show.platform || 'N/A'}
-                     </p>
-                      <p className="text-md text-gray-600">
-                         <strong>Avg. Episode Length:</strong> {show.avg_episode_length || 'N/A'}
-                     </p>
-                     {show.seasons && <p className="text-md text-gray-600"><strong>Seasons:</strong> {show.seasons}</p>}
-                </div>
-            </div>
-
-            {/* Visual Summaries Section - WITH CHARTS */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-8">
-                {/* Pie Chart Section */}
-                <div className="border p-4 rounded-lg shadow-sm">
-                     <h2 className="text-xl font-semibold text-center mb-4 text-teal-700">Stimulation Breakdown</h2>
-                     <div className="relative h-64 md:h-80">
-                         {/* Use memoized data */}
-                         {pieChartData ? (
-                             <Pie data={pieChartData} options={chartOptions} />
-                         ) : (
-                             <p className="text-center text-gray-400 italic mt-10">Loading chart...</p>
-                         )}
-                     </div>
-                </div>
-
-                {/* Bar Chart Section */}
-                 <div className="border p-4 rounded-lg shadow-sm">
-                     <h2 className="text-xl font-semibold text-center mb-4 text-teal-700">Sensory Factor Levels</h2>
-                     <div className="relative h-64 md:h-80">
-                         {/* Use memoized data */}
-                         {barChartData ? (
-                             <Bar data={barChartData} options={barChartOptions} />
-                         ) : (
-                             <p className="text-center text-gray-400 italic mt-10">Loading chart...</p>
-                         )}
-                     </div>
-                </div>
-            </div>
-
-             {/* Interaction Level & Narrative Summary */}
-             <div className="space-y-6">
-                 <div className="border p-4 rounded-lg shadow-sm bg-teal-50">
-                     <h2 className="text-xl font-semibold mb-2 text-teal-700">Interaction Level: {show.interactivity_level || 'N/A'}</h2>
-                     <p className="text-gray-700">{getInteractionExplanation(show.interactivity_level)}</p>
-                 </div>
-                 <div className="border p-4 rounded-lg shadow-sm">
-                     <h2 className="text-xl font-semibold mb-2 text-gray-700">Summary & Sensory Notes</h2>
-                     <p className="text-gray-600 italic">(Detailed narrative summary...)</p>
-                     <p className='mt-2 text-sm text-gray-600'><strong>Animation Style:</strong> {show.animation_style || 'N/A'}</p>
-                 </div>
-             </div>
-
+        <div className="max-w-5xl mx-auto bg-white p-5 md:p-8 rounded-lg shadow-lg border border-gray-100">
             {/* Back Button */}
-            <div className="mt-8 text-center">
-                <Link to="/shows" className="inline-block px-6 py-2 border border-teal-600 text-teal-600 rounded hover:bg-teal-50 transition duration-200">
-                    ← Back to Catalog
-                </Link>
+            <div className="mb-4"> <Link to="/shows" className="text-sm text-teal-600 hover:text-teal-800 hover:underline focus:outline-none focus:ring-1 focus:ring-teal-500 rounded px-1"> ← Back to Catalog </Link> </div>
+            {/* Main Content Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8">
+                {/* Left Column: Image & Key Info */}
+                <div className="md:col-span-1 space-y-4">
+                    <img src={imageUrl} alt={`${show.title} primary image`} className="rounded-lg shadow-md w-full object-contain border border-gray-200 bg-gray-50 aspect-[3/4]" onError={(e) => { e.target.onerror = null; e.target.src=placeholderImage }} loading="lazy" />
+                    <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 shadow-sm">
+                        <h2 className="text-lg font-semibold text-gray-700 mb-3 border-b pb-2">Key Information</h2>
+                        <DetailItem label="Target Age Range" value={show.target_age_group} />
+                        <DetailItem label="Platform(s)" value={show.platform} />
+                        <DetailItem label="Avg. Episode Length" value={show.avg_episode_length} />
+                        <DetailItem label="Seasons" value={show.seasons} />
+                        <DetailItem label="Overall Stimulation Score"> <ScoreVisual score={show.stimulation_score} /> </DetailItem>
+                        <DetailItem label="Themes"> <ThemeTags themes={show.themes} /> </DetailItem>
+                    </div>
+                </div>
+                {/* Right Column: Title, Sensory Details, Charts */}
+                 <div className="md:col-span-2 space-y-6">
+                     <h1 className="text-3xl md:text-4xl font-bold text-teal-800">{show.title}</h1>
+                     <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+                        <h2 className="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Sensory Details</h2>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-3">
+                            <DetailItem label="Dialogue Intensity" value={show.dialogue_intensity} />
+                            <DetailItem label="Scene Frequency" value={show.scene_frequency} />
+                            <DetailItem label="Sound Effects Level" value={show.sound_effects_level} />
+                            <DetailItem label="Music Tempo" value={show.music_tempo} />
+                            <DetailItem label="Total Music Level" value={show.total_music_level} />
+                             <div className="sm:col-span-2"> <DetailItem label="Interaction Level" value={show.interactivity_level}> <InteractionExplanation level={show.interactivity_level} /> </DetailItem> </div>
+                            <DetailItem label="Animation Style" value={show.animation_style} />
+                        </div>
+                     </div>
+                     {/* Charts Section */}
+                     {(chartData.pieData || chartData.barData) && (
+                        <div className="border border-gray-200 rounded-lg p-4 shadow-sm bg-white">
+                            <h2 className="text-xl font-semibold text-gray-700 mb-4 border-b pb-2">Visual Breakdown</h2>
+                             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 h-72 md:h-80">
+                                <div className="relative flex flex-col items-center">
+                                    <h3 className="text-center text-sm font-medium text-gray-600 mb-2">Factor Contribution</h3>
+                                    <div className='w-full h-full max-h-[250px]'> {chartData.pieData ? <Pie data={chartData.pieData} options={commonChartOptions} /> : <p className="err-msg">Data unavailable.</p>} </div>
+                                </div>
+                                <div className="relative flex flex-col items-center">
+                                     <h3 className="text-center text-sm font-medium text-gray-600 mb-2">Factor Scores (0-5)</h3>
+                                     <div className='w-full h-full max-h-[250px]'> {chartData.barData ? <Bar data={chartData.barData} options={barChartOptions} /> : <p className="err-msg">Data unavailable.</p>} </div>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+                </div>
             </div>
         </div>
     );
 };
+// Added basic error message class for charts
+const ErrMsg = ({ children }) => <p className="text-center text-gray-400 italic text-xs mt-10">{children}</p>;
+ShowDetailPage.Err = ErrMsg; // Assign ErrMsg to ShowDetailPage if needed elsewhere (unlikely)
 
 export default ShowDetailPage;

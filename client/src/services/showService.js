@@ -1,209 +1,224 @@
 // client/src/services/showService.js
 import axios from 'axios';
 
-// The base URL for our API. Uses the Vite proxy.
+// The base URL for our API. Uses the Vite proxy during development.
 const API_BASE_URL = '/api';
 
-// Helper function to construct consistent error messages
+// Create an axios instance (optional, but good practice for setting defaults)
+const apiClient = axios.create({
+    baseURL: API_BASE_URL,
+    timeout: 15000, // Increased timeout slightly (e.g., 15 seconds)
+});
+
+// --- Helper to Format Error Messages ---
 const formatErrorMessage = (error, context) => {
     let message = `An unknown error occurred ${context}.`;
-    if (error.response) {
+    // Check if the error is an Axios cancellation
+    if (axios.isCancel(error)) {
+        message = `Request cancelled ${context}.`;
+        console.log(message); // Log cancellations differently if needed
+        // Return a specific error type or message for cancellations
+        return "Request cancelled.";
+    } else if (error.response) {
         // Server responded with a status code outside 2xx range
-        message = error.response.data?.error || `Server error (${error.response.status}) ${context}.`;
-        // Handle specific statuses if needed, e.g., 404
-        if (error.response.status === 404 && context.includes("ID")) {
-             message = `Resource not found ${context}.`; // More specific 404
+        const status = error.response.status;
+        const serverError = error.response.data?.error || `Server responded with status ${status}`;
+        message = `${serverError} ${context}.`;
+        if (status === 404 && (context.includes("ID") || context.includes("title"))) {
+             message = `Resource not found ${context}.`;
+        } else if (status >= 500) {
+            message = `Server error (${status}) ${context}. Please try again later.`;
+        } else if (status === 400) {
+             message = `Invalid request ${context}. Check parameters. (${serverError})`;
         }
     } else if (error.request) {
-        // Request was made but no response received
-        message = `No response received from server ${context}. Check network or backend.`;
+        // Request was made but no response received (network error, server down)
+        message = `Network error: Could not connect to the server ${context}.`;
     } else {
         // Something else happened in setting up the request
-        message = error.message || message;
+        message = error.message ? `${error.message} ${context}.` : message;
     }
-    console.error(`Error ${context}:`, message, error); // Log the detailed error
+    console.error(`Error ${context}:`, message, error);
     return message; // Return the formatted message
 };
 
 /**
- * Fetches a list of shows from the backend API with filtering, sorting, and pagination.
- * Returns an object like { shows: [], totalShows: 0, ... } or a default object on error.
+ * Fetches a list of shows with filtering, sorting, and pagination.
+ * Returns an object like { shows: [], totalShows: 0, ... } or throws a formatted error.
  */
-export const getShows = async (filters = {}, page = 1, limit = 21) => {
+export const getShows = async (filters = {}, page = 1, limit = 21, options = {}) => {
+    const context = "while fetching shows";
     try {
-        const params = { ...filters, page, limit };
-        Object.keys(params).forEach(key => (params[key] == null || params[key] === '') && delete params[key]);
-
+        const cleanedFilters = { ...filters };
+        Object.keys(cleanedFilters).forEach(key => (cleanedFilters[key] == null || cleanedFilters[key] === '') && delete cleanedFilters[key]);
+        const params = { ...cleanedFilters, page, limit };
         console.log('Fetching shows with params:', params);
-        const response = await axios.get(`${API_BASE_URL}/shows`, { params });
 
-        // Ensure response data structure is as expected
-        if (response && response.data && Array.isArray(response.data.shows) && typeof response.data.totalPages === 'number') {
+        const response = await apiClient.get('/shows', { params, signal: options.signal });
+
+        if (response?.data && Array.isArray(response.data.shows) && typeof response.data.totalPages === 'number') {
              return response.data;
         } else {
-             console.warn("Received unexpected data structure from GET /shows:", response?.data);
-             // Return a default structure to prevent UI errors
-             return { shows: [], totalShows: 0, totalPages: 0, currentPage: 1, limit };
+             throw new Error("Received invalid data structure from server");
         }
     } catch (error) {
-       const errorMessage = formatErrorMessage(error, "while fetching shows");
-       // Re-throw the formatted error for the UI to handle
-       // Consider returning the default structure here too if preferred over throwing
-       // throw new Error(errorMessage);
-       // Returning default structure instead of throwing for smoother UI:
-       return { shows: [], totalShows: 0, totalPages: 0, currentPage: 1, limit };
+       // Don't throw cancellation errors, let the component handle it
+       if (axios.isCancel(error)) {
+           console.log("Show fetch cancelled.");
+           // Re-throw a specific cancellation error or return a specific state if needed by UI
+           throw error; // Let the caller handle cancellation if needed
+       }
+       const errorMessage = formatErrorMessage(error, context);
+       throw new Error(errorMessage);
     }
 };
 
 /**
  * Fetches details for a single show by its ID.
- * Returns the show object or null on error.
+ * Returns the show object or throws a formatted error.
  */
-export const getShowById = async (id) => {
-     if (!id) {
-         console.error("getShowById called with invalid ID.");
-         return null; // Return null for invalid input
+export const getShowById = async (id, options = {}) => {
+     if (!id || isNaN(parseInt(id))) {
+         const invalidIdError = "Invalid ID provided when fetching show.";
+         console.error(invalidIdError);
+         throw new Error(invalidIdError);
      }
      const context = `while fetching show ID ${id}`;
      try {
-        console.log(`Workspaceing show by ID: ${id}`);
-        const response = await axios.get(`${API_BASE_URL}/shows/${id}`);
-        // Return data if response is valid, otherwise null
-        return response?.data || null;
+        console.log(`Fetching show by ID: ${id}`);
+        const response = await apiClient.get(`/shows/${id}`, { signal: options.signal });
+        if (response?.data) { return response.data; }
+        else { throw new Error(`No data received for show ID ${id}.`); }
     } catch (error) {
+         if (axios.isCancel(error)) { console.log(`Show ID ${id} fetch cancelled.`); throw error; }
          const errorMessage = formatErrorMessage(error, context);
-         // Throwing the error might be better here if the detail page MUST have data
-         // throw new Error(errorMessage);
-         // Returning null for smoother UI, page should handle null state:
-         return null;
+         throw new Error(errorMessage);
      }
 };
 
  /**
   * Fetches details for a single show by its exact title.
-  * Returns the show object or null on error.
+  * Returns the show object or throws a formatted error.
   */
- export const getShowByTitle = async (title) => {
+ export const getShowByTitle = async (title, options = {}) => {
      if (!title || typeof title !== 'string' || title.trim().length === 0) {
-          console.error("getShowByTitle called with invalid title:", title);
-          return null; // Return null for invalid input
+          const invalidTitleError = "Invalid title provided when fetching show.";
+          console.error(invalidTitleError, title);
+          throw new Error(invalidTitleError);
      }
      const encodedTitle = encodeURIComponent(title.trim());
      const context = `while fetching show title "${title}"`;
-     console.log(`Workspaceing show by title: ${title}, Encoded: ${encodedTitle}`);
+     console.log(`Fetching show by title: ${title}, Encoded: ${encodedTitle}`);
      try {
-         const response = await axios.get(`${API_BASE_URL}/shows/title/${encodedTitle}`);
-          // Return data if response is valid, otherwise null
-         return response?.data || null;
+         const response = await apiClient.get(`/shows/title/${encodedTitle}`, { signal: options.signal });
+          if (response?.data) { return response.data; }
+          else { throw new Error(`No data received for show title "${title}".`); }
      } catch (error) {
+          if (axios.isCancel(error)) { console.log(`Show title ${title} fetch cancelled.`); throw error; }
          const errorMessage = formatErrorMessage(error, context);
-         // throw new Error(errorMessage); // Option to throw
-         return null; // Option to return null
+         throw new Error(errorMessage);
      }
  };
 
  /**
   * Fetches the list of unique theme names.
-  * Returns an array of strings or [] on error.
+  * Returns an array of strings or throws a formatted error.
   */
- export const getThemes = async () => {
+ export const getThemes = async (options = {}) => {
      const context = "while fetching themes";
      try {
         console.log("Fetching themes");
-         const response = await axios.get(`${API_BASE_URL}/themes`);
-         // Ensure data is an array, return [] otherwise
-         return Array.isArray(response?.data) ? response.data : [];
+         const response = await apiClient.get('/themes', { signal: options.signal });
+         if (Array.isArray(response?.data)) { return response.data; }
+         else { throw new Error("Received invalid theme data from server."); }
      } catch (error) {
-         formatErrorMessage(error, context); // Log the error
-         return []; // Return empty array on error
+         if (axios.isCancel(error)) { console.log("Theme fetch cancelled."); throw error; }
+         const errorMessage = formatErrorMessage(error, context);
+         throw new Error(errorMessage);
      }
  };
 
  /**
   * Fetches details for multiple shows based on an array of IDs for comparison.
-  * Returns an array of show objects or [] on error.
+  * Returns an array of show objects or throws a formatted error.
   */
- export const getShowsForComparison = async (ids) => {
-    if (!Array.isArray(ids) || ids.length === 0) { // Simplified check
+ export const getShowsForComparison = async (ids, options = {}) => {
+    if (!Array.isArray(ids) || ids.length === 0) {
         console.warn("getShowsForComparison called with invalid IDs:", ids);
-        return []; // Return empty array for invalid input
+        return []; // Return empty for invalid input
     }
-    // Limit comparison - This check might be better placed in the component calling it.
-    if (ids.length > 3) {
-        console.warn(`Attempted to compare ${ids.length} shows, limiting to 3.`);
-        ids = ids.slice(0, 3); // Silently limit or throw error? Limiting for now.
-    }
-
-    const validIds = ids.map(id => String(id).trim()).filter(id => id);
-    if (validIds.length === 0) {
-         return []; // Return empty if no valid IDs remain
-    }
+    const limitedIds = ids.slice(0, 3);
+    if (limitedIds.length !== ids.length) console.warn(`Attempted to compare ${ids.length} shows, limiting to ${limitedIds.length}.`);
+    const validIds = limitedIds.map(id => String(id).trim()).filter(id => id && !isNaN(parseInt(id)));
+    if (validIds.length === 0) { console.warn("No valid numeric IDs found for comparison."); return []; }
 
     const idString = validIds.join(',');
     const context = `while fetching shows for comparison (IDs: ${idString})`;
-    console.log(`Workspaceing shows for comparison with IDs: ${idString}`);
+    console.log(`Fetching shows for comparison with IDs: ${idString}`);
     try {
-        const response = await axios.get(`${API_BASE_URL}/shows/compare`, { params: { ids: idString } });
-        // Ensure data is an array
-        return Array.isArray(response?.data) ? response.data : [];
+        const response = await apiClient.get('/shows/compare', { params: { ids: idString }, signal: options.signal });
+         if (Array.isArray(response?.data)) { return response.data; }
+         else { throw new Error("Received invalid comparison data from server."); }
     } catch (error) {
-        formatErrorMessage(error, context); // Log the error
-        return []; // Return empty array on error
+        if (axios.isCancel(error)) { console.log("Comparison fetch cancelled."); throw error; }
+        const errorMessage = formatErrorMessage(error, context);
+        throw new Error(errorMessage);
     }
  };
 
 /**
  * Fetches autocomplete suggestions for show titles.
- * Returns an array of strings or [] on error.
+ * Returns an array of strings. Returns empty array on error, does not throw.
  */
-export const getAutocompleteSuggestions = async (term) => {
-    if (!term || typeof term !== 'string' || term.trim().length < 2) {
-        return []; // Return empty array for short/invalid terms
-    }
+export const getAutocompleteSuggestions = async (term, options = {}) => {
+    if (!term || typeof term !== 'string' || term.trim().length < 1) return []; // Allow 1 char?
     const searchTerm = term.trim();
     const context = `while fetching suggestions for term "${searchTerm}"`;
-    console.log(`Workspaceing suggestions for term: "${searchTerm}"`);
+    console.log(`Fetching suggestions for term: "${searchTerm}"`);
     try {
-        const response = await axios.get(`${API_BASE_URL}/suggestions`, { params: { term: searchTerm } });
-        // Ensure data is an array
-        return Array.isArray(response?.data) ? response.data : [];
+        const response = await apiClient.get('/suggestions', { params: { term: searchTerm }, signal: options.signal });
+        if (Array.isArray(response?.data)) { return response.data; }
+        else { console.warn("Received non-array data structure for suggestions:", response?.data); return []; }
     } catch (error) {
-        formatErrorMessage(error, context); // Log the error
-        return []; // Return empty array on error
+        if (axios.isCancel(error)) { console.log("Autocomplete fetch cancelled."); return []; }
+        // Format and log error, but return empty array for graceful UI
+        formatErrorMessage(error, context);
+        return [];
     }
 };
 
 /**
  * Fetches all data needed for the homepage in a single request.
- * Returns the homepage data object or null on error.
+ * Returns the homepage data object or throws a formatted error.
  */
-export const getHomepageData = async () => {
+export const getHomepageData = async (options = {}) => {
     const context = "while fetching homepage data";
     console.log(">>> Service: getHomepageData called.");
     try {
-        const response = await axios.get(`${API_BASE_URL}/homepage-data`);
-        // Basic check if data object exists
-        return response?.data || null;
+        const response = await apiClient.get('/homepage-data', { signal: options.signal });
+        if (response?.data && typeof response.data === 'object') { return response.data; }
+        else { throw new Error("Received invalid homepage data from server."); }
     } catch (error) {
+        if (axios.isCancel(error)) { console.log("Homepage data fetch cancelled."); throw error; }
         const errorMessage = formatErrorMessage(error, context);
-        // throw new Error(errorMessage); // Option to throw
-        return null; // Option to return null
+        throw new Error(errorMessage);
     }
 };
 
 /**
  * Fetches the complete list of show IDs and titles for dropdowns.
- * Returns an array of {id, title} objects or [] on error.
+ * Returns an array of {id, title} objects or throws a formatted error.
  */
-export const getShowList = async () => {
-    const context = "while fetching show list";
+export const getShowList = async (options = {}) => {
+    const context = "while fetching show list for dropdowns";
     console.log(">>> Service: getShowList called.");
     try {
-        const response = await axios.get(`${API_BASE_URL}/show-list`);
-        // Ensure data is an array
-        return Array.isArray(response?.data) ? response.data : [];
+        const response = await apiClient.get('/show-list', { signal: options.signal });
+        if (Array.isArray(response?.data)) { return response.data; }
+        else { throw new Error("Received invalid show list data from server."); }
     } catch (error) {
-        formatErrorMessage(error, context); // Log the error
-        return []; // Return empty array on error
+        if (axios.isCancel(error)) { console.log("Show list fetch cancelled."); throw error; }
+        const errorMessage = formatErrorMessage(error, context);
+        throw new Error(errorMessage);
     }
 };
